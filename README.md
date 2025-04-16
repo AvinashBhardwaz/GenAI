@@ -86,7 +86,6 @@ chat_template = ChatPromptTemplate([
 ---
 
 ## 🤖 Conversational Chat with Memory
-
 ```python
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
@@ -106,9 +105,9 @@ while True:
 from langchain_core.prompts import PromptTemplate
 
 template = PromptTemplate(
-    template=\"\"\"
+    template="""
     Please summarize the research paper titled "{paper_input}"...
-    \"\"\",
+    """,
     input_variables=['paper_input', 'style_input','length_input']
 )
 ```
@@ -116,7 +115,6 @@ template = PromptTemplate(
 ---
 
 ## 🖼️ Streamlit App: Research Tool
-
 ```python
 import streamlit as st
 
@@ -129,22 +127,81 @@ length_input = st.selectbox(...)
 
 ---
 
-## 🔄 Structured Output Plan
+## 🔄 Structured Output using Pydantic + TinyLlama
 
-You're now transitioning toward **structured output** using:
+```python
+from dotenv import load_dotenv
+from typing import Optional, Literal
+from pydantic import BaseModel, Field
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
-- `JsonOutputParser`
-- `PydanticOutputParser`
-- `Function calling` (planned)
+load_dotenv()
+
+llm = HuggingFaceEndpoint(
+    repo_id="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    task="text-generation"
+)
+
+model = ChatHuggingFace(llm=llm)
+
+class Review(BaseModel):
+    key_themes: list[str] = Field(description="Write down all the key themes discussed in the review in a list")
+    summary: str = Field(description="A brief summary of the review")
+    sentiment: Literal["pos", "neg"] = Field(description="Return sentiment of the review either negative or positive")
+    pros: Optional[list[str]] = Field(default=None, description="Write down all the pros inside a list")
+    cons: Optional[list[str]] = Field(default=None, description="Write down all the cons inside a list")
+    name: Optional[str] = Field(default=None, description="Write the name of the reviewer")
+
+structured_model = model.with_structured_output(Review)
+
+result = structured_model.invoke("Your product review here")
+print(result)
+```
 
 ---
 
-## ✅ Next Step
-
-Start using **structured outputs** to make your application more robust and production-ready.
+## 🧪 Output Example
+```json
+{
+  "key_themes": ["camera", "battery", "performance", "One UI", "S-Pen"],
+  "summary": "A high-performance phone with a stellar camera and fast charging, but slightly bulky and pricey.",
+  "sentiment": "pos",
+  "pros": ["200MP camera", "Snapdragon 8 Gen 3", "Fast charging", "S-Pen support"],
+  "cons": ["Bulky design", "Bloatware", "Expensive"],
+  "name": "Avinash Bhardwaz"
+}
+```
 
 ---
 
-## 💡 Final Thought
+## 📦 Output Parser
 
-> You're on the right path! Learning by doing, combining LangChain + OpenAI + HuggingFace + Streamlit is an ideal modern AI dev stack.
+### Extract structured fields from plain model output
+```python
+from langchain.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
+from typing import List, Literal, Optional
+
+class Review(BaseModel):
+    key_themes: List[str] = Field(description="List of major discussion points")
+    summary: str = Field(description="Brief review summary")
+    sentiment: Literal["pos", "neg"] = Field(description="Sentiment of the review")
+    pros: Optional[List[str]] = Field(default=None, description="List of pros")
+    cons: Optional[List[str]] = Field(default=None, description="List of cons")
+    name: Optional[str] = Field(default=None, description="Name of the reviewer")
+
+parser = PydanticOutputParser(pydantic_object=Review)
+
+format_instructions = parser.get_format_instructions()
+
+prompt = f"""
+Review this: "This phone has a great camera and battery life, but it's bulky."
+
+Format your output as follows:
+{format_instructions}
+"""
+
+output = model.invoke(prompt)
+parsed = parser.parse(output)
+print(parsed)
+```
