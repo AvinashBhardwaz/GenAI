@@ -35,7 +35,7 @@ llm = HuggingFacePipeline.from_model_id(
 
 ---
 
-## 📐 Embeddings
+## 🖐️ Embeddings
 
 ### OpenAI Embeddings
 ```python
@@ -205,3 +205,138 @@ output = model.invoke(prompt)
 parsed = parser.parse(output)
 print(parsed)
 ```
+
+---
+
+## ⚖️ Chains and Branching Logic
+
+### Conditional Chain with Sentiment Classifier and Response Generator
+```python
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from dotenv import load_dotenv
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain.schema.runnable import RunnableParallel, RunnableBranch, RunnableLambda
+from langchain_core.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
+from typing import Literal
+
+load_dotenv()
+
+model = ChatOpenAI()
+parser = StrOutputParser()
+
+class Feedback(BaseModel):
+    sentiment: Literal['positive', 'negative'] = Field(description='Give the sentiment of the feedback')
+
+parser2 = PydanticOutputParser(pydantic_object=Feedback)
+
+prompt1 = PromptTemplate(
+    template='Classify the sentiment of the following feedback text into postive or negative \n {feedback} \n {format_instruction}',
+    input_variables=['feedback'],
+    partial_variables={'format_instruction': parser2.get_format_instructions()}
+)
+
+classifier_chain = prompt1 | model | parser2
+
+prompt2 = PromptTemplate(
+    template='Write an appropriate response to this positive feedback \n {feedback}',
+    input_variables=['feedback']
+)
+
+prompt3 = PromptTemplate(
+    template='Write an appropriate response to this negative feedback \n {feedback}',
+    input_variables=['feedback']
+)
+
+branch_chain = RunnableBranch(
+    (lambda x: x.sentiment == 'positive', prompt2 | model | parser),
+    (lambda x: x.sentiment == 'negative', prompt3 | model | parser),
+    RunnableLambda(lambda x: "could not find sentiment")
+)
+
+chain = classifier_chain | branch_chain
+
+print(chain.invoke({'feedback': 'This is a beautiful phone'}))
+```
+
+This demonstrates:
+- **Classification + branching** using `RunnableBranch`
+- Multiple prompt templates + multiple models
+- Clear execution graph with conditional logic
+
+## Runnable Components in LangChain (with Nakli Examples)
+
+### What Are Runnables?
+**Runnables** are modular, chainable components in LangChain that follow a standard interface. They define a single method: `invoke(input_data)`. This enables plug-and-play architecture.
+
+### Why Do Runnables Exist?
+- To provide a **standardized way** to compose and connect AI components (prompts, models, parsers, etc.).
+- To make pipeline creation more **flexible**, **reusable**, and **composable**.
+- Allow easy debugging, swapping, and branching of logic like Lego blocks.
+
+---
+
+### Nakli Runnable Implementations
+Below are the simplified versions ("Nakli" = fake/mimic) of LangChain-style Runnables:
+
+#### `NakliPromptTemplate`
+- Mimics prompt formatting.
+- `invoke(input_dict)` fills template with data.
+
+#### `NakliLLM`
+- Mimics a language model.
+- `invoke(prompt)` returns a random dummy response.
+
+#### `NakliStrOutputParser`
+- Mimics a parser.
+- `invoke(input_dict)` just returns the 'response' value.
+
+#### `RunnableConnector`
+- Mimics chaining.
+- `invoke(input_dict)` runs a list of Runnables in order.
+
+#### Sample Chain:
+```python
+chain = RunnableConnector([
+    NakliPromptTemplate(...),
+    NakliLLM(),
+    NakliStrOutputParser()
+])
+```
+
+---
+
+### Real LangChain Examples
+
+#### `RunnableSequence`
+- What: A sequence of steps (like Prompt -> Model -> Parser).
+- Why: To build modular chains.
+- How: `RunnableSequence(prompt, model, parser)`
+
+#### `RunnableParallel`
+- What: Runs multiple Runnables at the same time.
+- Why: To get different outputs from same input (e.g., joke + explanation).
+- How: Uses a dictionary of Runnables.
+
+#### `RunnablePassthrough`
+- What: A pass-through step.
+- Why: Used in branches when no change is needed.
+- How: Just returns input.
+
+#### `RunnableLambda`
+- What: Wraps a custom Python function into a Runnable.
+- Why: Useful for logic like word count, filtering.
+- How: `RunnableLambda(func)`
+
+#### `RunnableBranch`
+- What: Executes different logic paths based on conditions.
+- Why: For conditional logic like summarizing only long texts.
+- How: `RunnableBranch((condition, step_if_true), default_step)`
+
+---
+
+
+
+---
