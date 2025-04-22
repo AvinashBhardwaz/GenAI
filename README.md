@@ -336,6 +336,77 @@ chain = RunnableConnector([
 - How: `RunnableBranch((condition, step_if_true), default_step)`
 
 ---
+# LangChain Runnable Playground
+
+This project explores the concept of Runnables in LangChain, demonstrating how to build flexible and modular chains using mock components like LLMs, prompt templates, and output parsers.
+
+## Sections
+
+### 1. Runnable Components
+We re-implemented basic LangChain concepts from scratch using custom classes such as `NakliLLM`, `NakliPromptTemplate`, `NakliStrOutputParser`, and `RunnableConnector`. Each class follows the Runnable protocol by implementing the `invoke()` method. This approach helps understand LangChain's functional programming style.
+
+#### Custom Runnable Components
+- `NakliLLM`: Mock language model that randomly selects a pre-defined response.
+- `NakliPromptTemplate`: Formats input based on a template string.
+- `NakliStrOutputParser`: Extracts the final string from the LLM output.
+- `RunnableConnector`: Chains multiple `Runnable` components in sequence.
+
+#### Example
+```python
+chain = RunnableConnector([template, llm, parser])
+result = chain.invoke({'length': 'short', 'topic': 'India'})
+```
+
+### 2. LangChain Native Runnables
+We then moved to native LangChain classes and structure using `RunnableSequence`, `RunnableParallel`, `RunnablePassthrough`, `RunnableLambda`, and `RunnableBranch`.
+
+#### Examples Covered:
+- **RunnableSequence**: Chain components in a sequence (prompt → model → parser)
+- **RunnableParallel**: Run multiple branches in parallel (e.g., response + metadata)
+- **RunnablePassthrough**: Pass input data without modification (used as an identity function)
+- **RunnableLambda**: Add logic with Python functions (e.g., word count)
+- **RunnableBranch**: Apply logic based on conditions (e.g., summarize if text is long)
+
+```python
+# Example RunnableBranch
+branch_chain = RunnableBranch(
+    (lambda x: len(x.split()) > 300, summarizer_chain),
+    RunnablePassthrough()
+)
+```
+
+### 3. Document Loaders
+We explored different document loaders for real-world data ingestion:
+- `TextLoader`: Load `.txt` files.
+- `CSVLoader`: Load `.csv` files into LangChain documents.
+- `PyPDFLoader`: Load PDF files, including multi-page books.
+- `DirectoryLoader`: Load all matching files from a directory.
+- `WebBaseLoader`: Scrape and load web content.
+
+```python
+loader = WebBaseLoader("https://example.com")
+docs = loader.load()
+```
+
+### 4. Putting It All Together
+We demonstrated Q&A over webpage content using:
+- `WebBaseLoader` to scrape a product page.
+- A `PromptTemplate` to inject the question and content.
+- `ChatOpenAI` model to generate the answer.
+- `StrOutputParser` to return plain text.
+
+```python
+chain = prompt | model | parser
+result = chain.invoke({
+  'question': 'What is the product?',
+  'text': docs[0].page_content
+})
+```
+
+---
+
+This README will be updated as we continue learning more about LangChain and GenAI workflows. ✅
+
 
 
 
