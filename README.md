@@ -402,10 +402,178 @@ result = chain.invoke({
   'text': docs[0].page_content
 })
 ```
+## 📄 LangChain Experiments
+
+This repo contains my experiments using LangChain with different data sources, models, and chains. Each section demonstrates how to load and process different document types and how to chain models and tools.
 
 ---
 
-This README will be updated as we continue learning more about LangChain and GenAI workflows. ✅
+### 🧱 Runnable Components
+
+LangChain provides a modular approach using `Runnable` classes:
+- **RunnableSequence**: A pipeline of chained operations.
+- **RunnableParallel**: Executes branches of logic in parallel.
+- **RunnablePassthrough**: Passes input directly to output (no transformation).
+- **RunnableLambda**: Wraps a Python function for inline transformations.
+- **RunnableBranch**: Executes conditional logic like if-else.
+
+🔍 Each component helps structure custom workflows for LLM processing.
+
+---
+
+### 🃏 Prompt + Model + Output Parsing
+```python
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+prompt = PromptTemplate(
+    template='Write a joke about {topic}',
+    input_variables=['topic']
+)
+model = ChatOpenAI()
+parser = StrOutputParser()
+
+chain = prompt | model | parser
+```
+
+---
+
+### 🔄 Sequential + Parallel + Branching Chains
+```python
+from langchain.schema.runnable import RunnableSequence, RunnableParallel, RunnablePassthrough, RunnableLambda, RunnableBranch
+
+# Sequential chain
+joke_chain = RunnableSequence(prompt, model, parser)
+
+# Parallel output (get joke and word count)
+parallel = RunnableParallel({
+    'joke': RunnablePassthrough(),
+    'word_count': RunnableLambda(lambda x: len(x.split()))
+})
+
+final_chain = RunnableSequence(joke_chain, parallel)
+result = final_chain.invoke({"topic": "AI"})
+```
+
+---
+
+### 🗂 Document Loaders
+```python
+# CSV
+from langchain_community.document_loaders import CSVLoader
+loader = CSVLoader(file_path='Social_Network_Ads.csv')
+docs = loader.load()
+
+# Text
+from langchain_community.document_loaders import TextLoader
+loader = TextLoader('cricket.txt')
+docs = loader.load()
+
+# PDF
+from langchain_community.document_loaders import PyPDFLoader
+loader = PyPDFLoader('dl-curriculum.pdf')
+docs = loader.load()
+
+# Directory of PDFs
+from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.document_loaders import PyPDFLoader
+loader = DirectoryLoader(path='books', glob='*.pdf', loader_cls=PyPDFLoader)
+docs = loader.lazy_load()
+
+# Web
+from langchain_community.document_loaders import WebBaseLoader
+loader = WebBaseLoader("https://example.com")
+docs = loader.load()
+```
+
+---
+
+### ✂️ Text Splitters
+#### 1. CharacterTextSplitter
+```python
+from langchain.text_splitter import CharacterTextSplitter
+splitter = CharacterTextSplitter(chunk_size=200, chunk_overlap=0)
+chunks = splitter.split_documents(docs)
+```
+
+#### 2. RecursiveCharacterTextSplitter
+```python
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0)
+chunks = splitter.split_text(text)
+```
+
+#### 3. RecursiveCharacterTextSplitter with Markdown
+```python
+from langchain.text_splitter import RecursiveCharacterTextSplitter, Language
+splitter = RecursiveCharacterTextSplitter.from_language(
+    language=Language.MARKDOWN, chunk_size=200, chunk_overlap=0
+)
+chunks = splitter.split_text(markdown_text)
+```
+
+#### 4. RecursiveCharacterTextSplitter with Python Code
+```python
+from langchain.text_splitter import RecursiveCharacterTextSplitter, Language
+splitter = RecursiveCharacterTextSplitter.from_language(
+    language=Language.PYTHON, chunk_size=300, chunk_overlap=0
+)
+chunks = splitter.split_text(python_code)
+```
+
+#### 5. SemanticChunker (Experimental)
+```python
+from langchain_experimental.text_splitter import SemanticChunker
+from langchain_openai.embeddings import OpenAIEmbeddings
+text_splitter = SemanticChunker(
+    OpenAIEmbeddings(),
+    breakpoint_threshold_type="standard_deviation",
+    breakpoint_threshold_amount=3
+)
+docs = text_splitter.create_documents([sample_text])
+```
+
+---
+
+### 🧪 Example Use Case: Summarize Web Text
+```python
+from langchain_openai import ChatOpenAI
+from langchain_community.document_loaders import WebBaseLoader
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+
+loader = WebBaseLoader("https://www.flipkart.com/apple-macbook-air...")
+docs = loader.load()
+
+prompt = PromptTemplate(
+    template='Answer the following question\n{question} from the following text:\n{text}',
+    input_variables=['question','text']
+)
+model = ChatOpenAI()
+parser = StrOutputParser()
+chain = prompt | model | parser
+print(chain.invoke({"question": "What product is being described?", "text": docs[0].page_content}))
+```
+
+---
+
+### 🔧 Setup
+```bash
+pip install -r requirements.txt
+```
+Your `.env` file should contain:
+```
+OPENAI_API_KEY=your-key-here
+```
+
+---
+
+More sections coming soon: vector stores, memory, agents, RAG!
+
+
+---
+
 
 
 
